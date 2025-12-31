@@ -3,7 +3,7 @@ name: Deploy Node.js Backend to Production
 on:
   push:
     branches:
-      - prod   # Trigger auto-deploy on merge to prod
+      - prod  # Trigger auto-deploy on merge to prod
 
 jobs:
   deploy:
@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout code
-      - name: Checkout repository
+      # 1️⃣ Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       # 2️⃣ Setup Node.js
@@ -25,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # 4️⃣ Copy code to server
+      # 4️⃣ Copy project files to server
       - name: Copy project files to server
         uses: appleboy/scp-action@v1
         with:
@@ -36,7 +36,7 @@ jobs:
           source: "."
           target: "/home/youruser/backend-app"
 
-      # 5️⃣ Setup .env and restart app
+      # 5️⃣ Setup environment & restart backend
       - name: Setup environment & restart backend
         uses: appleboy/ssh-action@v1
         with:
@@ -68,7 +68,7 @@ EOF
             # Install any new dependencies
             npm install
 
-            # Restart backend with PM2
+            # Restart backend using PM2
             pm2 stop backend || true
             pm2 start npm --name "backend" -- start
             pm2 save
