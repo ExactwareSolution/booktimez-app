@@ -3,7 +3,7 @@ name: Deploy Node.js Backend to Production
 on:
   push:
     branches:
-      - prod  # Trigger auto-deploy on merge to prod
+      - prod
 
 jobs:
   deploy:
@@ -41,22 +41,21 @@ jobs:
           port: ${{ secrets.SERVER_SSH_PORT }}
           script: |
             cd /home/youruser/backend-app
-cat > .env <<EOF
-DB_HOST=${{ secrets.DB_HOST }}
-DB_PORT=${{ secrets.DB_PORT }}
-DB_NAME=${{ secrets.DB_NAME }}
-DB_USER=${{ secrets.DB_USER }}
-DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-JWT_SECRET=${{ secrets.JWT_SECRET }}
-GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-SMTP_URL=${{ secrets.SMTP_URL }}
-PORT=${{ secrets.PORT }}
-APP_BASE_URL=${{ secrets.APP_BASE_URL }}
-FRONTEND_BASE_URL=${{ secrets.FRONTEND_BASE_URL }}
-RAZORPAY_KEY_ID=${{ secrets.RAZORPAY_KEY_ID }}
-RAZORPAY_KEY_SECRET=${{ secrets.RAZORPAY_KEY_SECRET }}
-EOF
+            echo "DB_HOST=${{ secrets.DB_HOST }}" > .env
+            echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
+            echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+            echo "DB_USER=${{ secrets.DB_USER }}" >> .env
+            echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+            echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" >> .env
+            echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" >> .env
+            echo "SMTP_URL=${{ secrets.SMTP_URL }}" >> .env
+            echo "PORT=${{ secrets.PORT }}" >> .env
+            echo "APP_BASE_URL=${{ secrets.APP_BASE_URL }}" >> .env
+            echo "FRONTEND_BASE_URL=${{ secrets.FRONTEND_BASE_URL }}" >> .env
+            echo "RAZORPAY_KEY_ID=${{ secrets.RAZORPAY_KEY_ID }}" >> .env
+            echo "RAZORPAY_KEY_SECRET=${{ secrets.RAZORPAY_KEY_SECRET }}" >> .env
+
             npm install
             pm2 stop backend || true
             pm2 start npm --name "backend" -- start
