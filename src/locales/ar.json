@@ -1,0 +1,4 @@
+{
+  "email_confirmation_subject": "تم تأكيد حجزك",
+  "email_confirmation_body": "مرحبًا {{name}}،\n\nتم تأكيد حجزك في {{business}} في {{time}}.\n\nشكرًا،\nBookTimez"
+}

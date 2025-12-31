@@ -1,0 +1,12 @@
+# Stripe
+STRIPE_SECRET=your_stripe_secret_here
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your_google_client_id_here
+GOOGLE_CLIENT_SECRET=your_google_client_secret_here
+
+# Other env variables
+DB_URL=your_database_url_here
+APP_PROTOCOL=http
+APP_FRONTEND_PORT=5173
+APP_ROOT_DOMAIN=booktimez.com

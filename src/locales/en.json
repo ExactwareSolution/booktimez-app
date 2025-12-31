@@ -1,0 +1,4 @@
+{
+  "email_confirmation_subject": "Your booking is confirmed",
+  "email_confirmation_body": "Hello {{name}},\n\nYour booking at {{business}} is confirmed for {{time}}.\n\nThanks,\nBookTimez"
+}

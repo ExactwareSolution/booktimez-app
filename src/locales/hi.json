@@ -1,0 +1,4 @@
+{
+  "email_confirmation_subject": "आपकी बुकिंग की पुष्टि हो गई है",
+  "email_confirmation_body": "नमस्ते {{name}},\n\nआपकी बुकिंग {{business}} के लिए {{time}} पर पुष्टि कर दी गई है।\n\nधन्यवाद,\nBookTimez"
+}
