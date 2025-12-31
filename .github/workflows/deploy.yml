@@ -1,0 +1,74 @@
+name: Deploy Node.js Backend to Production
+
+on:
+  push:
+    branches:
+      - prod   # Trigger auto-deploy on merge to prod
+
+jobs:
+  deploy:
+    name: Deploy to Production Server
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # 4️⃣ Copy code to server
+      - name: Copy project files to server
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_SSH_PORT }}
+          source: "."
+          target: "/home/youruser/backend-app"
+
+      # 5️⃣ Setup .env and restart app
+      - name: Setup environment & restart backend
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_SSH_PORT }}
+          script: |
+            cd /home/youruser/backend-app
+
+            # Create .env from secrets
+            cat > .env <<EOF
+DB_HOST=${{ secrets.DB_HOST }}
+DB_PORT=${{ secrets.DB_PORT }}
+DB_NAME=${{ secrets.DB_NAME }}
+DB_USER=${{ secrets.DB_USER }}
+DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+JWT_SECRET=${{ secrets.JWT_SECRET }}
+GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+SMTP_URL=${{ secrets.SMTP_URL }}
+PORT=${{ secrets.PORT }}
+APP_BASE_URL=${{ secrets.APP_BASE_URL }}
+FRONTEND_BASE_URL=${{ secrets.FRONTEND_BASE_URL }}
+RAZORPAY_KEY_ID=${{ secrets.RAZORPAY_KEY_ID }}
+RAZORPAY_KEY_SECRET=${{ secrets.RAZORPAY_KEY_SECRET }}
+EOF
+
+            # Install any new dependencies
+            npm install
+
+            # Restart backend with PM2
+            pm2 stop backend || true
+            pm2 start npm --name "backend" -- start
+            pm2 save
