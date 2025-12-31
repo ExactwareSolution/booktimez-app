@@ -11,21 +11,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repository
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: npm install
 
-      # 4️⃣ Copy project files to server
       - name: Copy project files to server
         uses: appleboy/scp-action@v1
         with:
@@ -36,7 +32,6 @@ jobs:
           source: "."
           target: "/home/youruser/backend-app"
 
-      # 5️⃣ Setup environment & restart backend
       - name: Setup environment & restart backend
         uses: appleboy/ssh-action@v1
         with:
@@ -46,9 +41,7 @@ jobs:
           port: ${{ secrets.SERVER_SSH_PORT }}
           script: |
             cd /home/youruser/backend-app
-
-            # Create .env from secrets
-            cat > .env <<EOF
+cat > .env <<EOF
 DB_HOST=${{ secrets.DB_HOST }}
 DB_PORT=${{ secrets.DB_PORT }}
 DB_NAME=${{ secrets.DB_NAME }}
@@ -64,11 +57,7 @@ FRONTEND_BASE_URL=${{ secrets.FRONTEND_BASE_URL }}
 RAZORPAY_KEY_ID=${{ secrets.RAZORPAY_KEY_ID }}
 RAZORPAY_KEY_SECRET=${{ secrets.RAZORPAY_KEY_SECRET }}
 EOF
-
-            # Install any new dependencies
             npm install
-
-            # Restart backend using PM2
             pm2 stop backend || true
             pm2 start npm --name "backend" -- start
             pm2 save
