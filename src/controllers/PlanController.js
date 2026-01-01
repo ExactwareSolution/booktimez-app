@@ -113,17 +113,27 @@ async function createRazorpayOrder(req, res) {
       key_secret: RAZORPAY_KEY_SECRET,
     });
 
-    const planCode = req.params.id; // "pro"
-    const plan = await Plan.findOne({ where: { code: planCode } });
+    // const planCode = req.params.id; // "pro"
+    const planId = req.params.id;
+    // const plan = await Plan.findOne({ where: { code: planCode } });
+    const plan = await Plan.findByPk(planId);
     if (!plan) return res.status(404).json({ error: "plan_not_found" });
 
+    // 2. FIX THE AMOUNT:
+    // Use plan.price (from your JSON) and multiply by 100 for paise
+    const amountInPaise = Math.round(Number(plan.price) * 100);
+
+    if (!amountInPaise || amountInPaise <= 0) {
+      return res.status(400).json({ error: "invalid_plan_price" });
+    }
+
     const options = {
-      amount: plan.monthlyPriceCents, // paise
+      amount: amountInPaise, // Corrected variable
       currency: "INR",
-      receipt: `pl_${plan.id.slice(0, 8)}_${Date.now().toString().slice(-6)}`,
+      receipt: `pl_${plan.id.slice(0, 8)}`,
       payment_capture: 1,
       notes: {
-        planCode: plan.code, // ✅ SAFE
+        planId: plan.id,
         userId: req.user.userId,
       },
     };
