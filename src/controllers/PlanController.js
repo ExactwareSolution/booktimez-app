@@ -99,7 +99,7 @@ async function createCheckout(req, res) {
 }
 
 // ================================
-// CREATE RAZORPAY ORDER
+// CREATE RAZORPAY ORDER (FIXED)
 // ================================
 async function createRazorpayOrder(req, res) {
   try {
@@ -113,36 +113,35 @@ async function createRazorpayOrder(req, res) {
       key_secret: RAZORPAY_KEY_SECRET,
     });
 
-    // const planCode = req.params.id; // "pro"
     const planId = req.params.id;
-    // const plan = await Plan.findOne({ where: { code: planCode } });
     const plan = await Plan.findByPk(planId);
     if (!plan) return res.status(404).json({ error: "plan_not_found" });
 
-    // 2. FIX THE AMOUNT:
-    // Use plan.price (from your JSON) and multiply by 100 for paise
     const amountInPaise = Math.round(Number(plan.price) * 100);
-
     if (!amountInPaise || amountInPaise <= 0) {
       return res.status(400).json({ error: "invalid_plan_price" });
     }
 
+    // ✅ Razorpay receipt must be <= 40 chars
+    const receipt = `pl_${Date.now()}`; // ALWAYS SAFE
+
     const options = {
-      amount: amountInPaise, // Corrected variable
+      amount: amountInPaise,
       currency: "INR",
-      receipt: `pl_${plan.id.slice(0, 8)}`,
+      receipt,
       payment_capture: 1,
       notes: {
-        planId: plan.id,
+        planId: plan.id, // UUID stored safely here
+        planCode: plan.code,
         userId: req.user.userId,
       },
     };
 
     const order = await razor.orders.create(options);
-    res.json({ order, keyId: RAZORPAY_KEY_ID });
+    return res.json({ order, keyId: RAZORPAY_KEY_ID });
   } catch (err) {
     console.error("createRazorpayOrder error:", err);
-    res.status(500).json({ error: "razorpay_error" });
+    return res.status(500).json({ error: "razorpay_error" });
   }
 }
 
@@ -153,7 +152,9 @@ async function confirmCheckout(req, res) {
   try {
     const body = req.body;
 
-    // ---------- STRIPE ----------
+    /* ============================
+       STRIPE FLOW
+    ============================ */
     if (body.sessionId) {
       const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
       const session = await stripe.checkout.sessions.retrieve(body.sessionId);
@@ -174,25 +175,32 @@ async function confirmCheckout(req, res) {
       const expiresAt = new Date();
       expiresAt.setMonth(expiresAt.getMonth() + 1);
 
-      user.planId = plan.id; // ✅ UUID
+      user.planId = plan.id;
       user.planExpiresAt = expiresAt;
       await user.save();
 
-      return res.json({ ok: true, plan: plan.code, expiresAt });
+      return res.json({
+        ok: true,
+        planId: plan.id,
+        planCode: plan.code,
+        expiresAt,
+      });
     }
 
-    // ---------- RAZORPAY ----------
+    /* ============================
+       RAZORPAY FLOW
+    ============================ */
     if (
       body.razorpay_payment_id &&
       body.razorpay_order_id &&
       body.razorpay_signature
     ) {
-      const generated = crypto
+      const generatedSignature = crypto
         .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
         .update(`${body.razorpay_order_id}|${body.razorpay_payment_id}`)
         .digest("hex");
 
-      if (generated !== body.razorpay_signature) {
+      if (generatedSignature !== body.razorpay_signature) {
         return res.status(400).json({ error: "invalid_signature" });
       }
 
@@ -202,10 +210,14 @@ async function confirmCheckout(req, res) {
       });
 
       const order = await razor.orders.fetch(body.razorpay_order_id);
-      const planCode = order.notes.planCode;
-      const userId = order.notes.userId;
 
-      const plan = await Plan.findOne({ where: { code: planCode } });
+      const { planId, planCode, userId } = order.notes;
+
+      if (!planId || !userId) {
+        return res.status(400).json({ error: "invalid_order_notes" });
+      }
+
+      const plan = await Plan.findByPk(planId);
       if (!plan) return res.status(404).json({ error: "plan_not_found" });
 
       const user = await User.findByPk(userId);
@@ -214,17 +226,22 @@ async function confirmCheckout(req, res) {
       const expiresAt = new Date();
       expiresAt.setMonth(expiresAt.getMonth() + 1);
 
-      user.planId = plan.id; // ✅ UUID
+      user.planId = plan.id;
       user.planExpiresAt = expiresAt;
       await user.save();
 
-      return res.json({ ok: true, plan: plan.code, expiresAt });
+      return res.json({
+        ok: true,
+        planId: plan.id,
+        planCode: plan.code,
+        expiresAt,
+      });
     }
 
     return res.status(400).json({ error: "unsupported_payment_flow" });
   } catch (err) {
     console.error("confirmCheckout error:", err);
-    res.status(500).json({ error: "confirm_error" });
+    return res.status(500).json({ error: "confirm_error" });
   }
 }
 

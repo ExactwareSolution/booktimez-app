@@ -25,20 +25,32 @@ async function register(req, res) {
 
 async function login(req, res) {
   const { email, password } = req.body;
-  if (!email || !password)
+
+  if (!email || !password) {
     return res.status(400).json({ error: "email+password required" });
+  }
 
   const user = await User.findOne({ where: { email } });
-  if (!user || !user.password)
+  if (!user || !user.password) {
     return res.status(401).json({ error: "invalid" });
+  }
 
   const ok = await bcrypt.compare(password, user.password);
-  if (!ok) return res.status(401).json({ error: "invalid" });
+  if (!ok) {
+    return res.status(401).json({ error: "invalid" });
+  }
 
-  // Check if user has at least one business
-  const businessCount = await Business.count({ where: { ownerId: user.id } });
+  // 🔹 Fetch plan to get planCode
+  const plan = user.planId ? await Plan.findByPk(user.planId) : null;
+
+  // 🔹 Business availability
+  const businessCount = await Business.count({
+    where: { ownerId: user.id },
+  });
+
   const isBusinessAvailable = businessCount > 0;
 
+  // 🔹 JWT
   const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
     expiresIn: "7d",
   });
@@ -50,6 +62,7 @@ async function login(req, res) {
       email: user.email,
       name: user.name,
       planId: user.planId,
+      planCode: plan?.code || "FREE", // ✅ SAFE
       role: user.role,
     },
     isBusinessAvailable,
@@ -61,24 +74,11 @@ async function google(req, res) {
   try {
     const { email, googleId, name } = req.body;
 
-    if (!email || !googleId)
+    if (!email || !googleId) {
       return res.status(400).json({ error: "googleId + email required" });
-
-    // Ensure a FREE plan exists
-    let freePlan = await Plan.findOne({ where: { name: "Free" } });
-    if (!freePlan) {
-      freePlan = await Plan.create({
-        name: "Free",
-        monthlyPriceCents: 0,
-        maxBookingsPerMonth: 30,
-        maxCategories: 1,
-        languages: ["en"],
-        brandingRemoved: false,
-        notificationsIncluded: true,
-      });
     }
 
-    // Find user by googleId or email
+    // 🔹 Find or create user
     let user = await User.findOne({ where: { googleId } });
     if (!user) user = await User.findOne({ where: { email } });
 
@@ -96,11 +96,17 @@ async function google(req, res) {
       });
     }
 
-    // Check if user has at least one business
-    const businessCount = await Business.count({ where: { ownerId: user.id } });
+    // 🔹 Fetch plan
+    const plan = await Plan.findByPk(user.planId);
+
+    // 🔹 Business availability
+    const businessCount = await Business.count({
+      where: { ownerId: user.id },
+    });
+
     const isBusinessAvailable = businessCount > 0;
 
-    // Create JWT
+    // 🔹 JWT
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
       expiresIn: "7d",
     });
@@ -112,6 +118,7 @@ async function google(req, res) {
         email: user.email,
         name: user.name,
         planId: user.planId,
+        planCode: plan?.code || "FREE", // ✅ FIXED
         role: user.role,
       },
       isBusinessAvailable,
