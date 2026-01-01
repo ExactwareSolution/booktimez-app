@@ -5,10 +5,12 @@ const cors = require("cors");
 const { sequelize, Plan } = require("./models");
 
 const authRoutes = require("./routes/auth");
+const userRoutes = require("./routes/user");
 const businessRoutes = require("./routes/business");
 const publicRoutes = require("./routes/public");
 const plansRoutes = require("./routes/plans");
 const categoryRoutes = require("./routes/category");
+const analyticsRoutes = require("./routes/analytics");
 
 const app = express();
 app.use(
@@ -55,10 +57,12 @@ app.get("/b/:slug", async (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api", userRoutes);
 app.use("/api/business", businessRoutes);
 app.use("/api/public", publicRoutes);
 app.use("/api/plans", plansRoutes);
 app.use("/api/categories", categoryRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 app.get("/", (req, res) => res.json({ ok: true }));
 

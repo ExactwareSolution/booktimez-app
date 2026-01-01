@@ -72,6 +72,17 @@ Payment.belongsTo(Plan, { foreignKey: "planId" });
 Business.hasMany(Payment, { foreignKey: "businessId" });
 Payment.belongsTo(Business, { foreignKey: "businessId" });
 
+// USER ↔ PLAN
+User.belongsTo(Plan, {
+  foreignKey: "planId",
+  as: "plan",
+});
+
+Plan.hasMany(User, {
+  foreignKey: "planId",
+  as: "users",
+});
+
 // --------------------
 // EXPORT
 // --------------------

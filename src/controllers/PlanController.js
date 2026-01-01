@@ -19,7 +19,7 @@ async function resolvePlan(identifier) {
 
 async function listPlans(req, res) {
   const plans = await Plan.findAll({
-    // order: [["monthlyPriceCents", "ASC"]]
+    order: [["price", "ASC"]],
   });
   res.json({ plans });
 }
