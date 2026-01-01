@@ -11,26 +11,26 @@ const plansRoutes = require("./routes/plans");
 const categoryRoutes = require("./routes/category");
 
 const app = express();
-app.use(cors("*"));
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  })
+);
+
 app.use(bodyParser.json());
 
-app.use(express.static("public"));
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
- 
 app.use((req, res, next) => {
-  const host = req.headers.host; // saqeeb-khan.booktimez.com
-  const subdomain = host.split(".")[0];
-
-  req.subdomain = subdomain;
+  const host = req.headers.host || "";
+  const cleanHost = host.split(":")[0]; // remove port
+  const parts = cleanHost.split(".");
+  req.subdomain = parts.length > 2 ? parts[0] : null;
   next();
 });
 
 // Serve uploaded files (logos)
 const path = require("path");
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
-
 
 app.get("/b/:slug", async (req, res) => {
   try {
