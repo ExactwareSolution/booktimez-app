@@ -11,6 +11,7 @@ const publicRoutes = require("./routes/public");
 const plansRoutes = require("./routes/plans");
 const categoryRoutes = require("./routes/category");
 const analyticsRoutes = require("./routes/analytics");
+const resourceRoutes = require("./routes/resource");
 
 const app = express();
 app.use(
@@ -63,6 +64,7 @@ app.use("/api/public", publicRoutes);
 app.use("/api/plans", plansRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/resources", resourceRoutes);
 
 app.get("/", (req, res) => res.json({ ok: true }));
 
@@ -76,42 +78,46 @@ async function start() {
   console.log("Database schema synchronized (alter: true)");
 
   // seed plans if empty
-  // const count = await Plan.count().catch(() => 0);
-  // if (!count) {
-  //   await Plan.bulkCreate([
-  //     {
-  //       code: "free",
-  //       name: "Free",
-  //       monthlyPriceCents: 0,
-  //       maxBookingsPerMonth: 30,
-  //       maxCategories: 1,
-  //       languages: ["en"],
-  //       brandingRemoved: false,
-  //       notificationsIncluded: false,
-  //     },
-  //     {
-  //       code: "standard",
-  //       name: "Standard",
-  //       monthlyPriceCents: 900,
-  //       maxBookingsPerMonth: 100,
-  //       maxCategories: 10,
-  //       languages: ["en", "hi"],
-  //       brandingRemoved: false,
-  //       notificationsIncluded: true,
-  //     },
-  //     {
-  //       code: "pro",
-  //       name: "Pro",
-  //       monthlyPriceCents: 1900,
-  //       maxBookingsPerMonth: 1000,
-  //       maxCategories: 50,
-  //       languages: ["en", "hi", "ar"],
-  //       brandingRemoved: true,
-  //       notificationsIncluded: true,
-  //     },
-  //   ]);
-  //   console.log("Seeded default plans");
-  // }
+  const count = await Plan.count().catch(() => 0);
+  if (!count) {
+    await Plan.bulkCreate([
+      {
+        code: "free",
+        name: "Free",
+        price: 0, // use 'price', not 'monthlyPriceCents'
+        maxBookingsPerMonth: 30,
+        maxCategories: 1,
+        maxResources: 1,
+        languages: ["en"],
+        brandingRemoved: false,
+        notificationsIncluded: false,
+      },
+      {
+        code: "standard",
+        name: "Standard",
+        price: 900, // corrected field
+        maxBookingsPerMonth: 100,
+        maxCategories: 3,
+        maxResources: 3, // added default value, adjust as needed
+        languages: ["en", "hi"],
+        brandingRemoved: false,
+        notificationsIncluded: true,
+      },
+      {
+        code: "pro",
+        name: "Pro",
+        price: 1900, // corrected field
+        maxBookingsPerMonth: 1000,
+        maxCategories: 5,
+        maxResources: 5, // added default value, adjust as needed
+        languages: ["en", "hi", "ar"],
+        brandingRemoved: true,
+        notificationsIncluded: true,
+      },
+    ]);
+
+    console.log("Seeded default plans");
+  }
 
   app.listen(PORT, () => console.log(`Server listening on ${PORT}`));
 }

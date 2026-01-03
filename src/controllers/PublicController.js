@@ -1,4 +1,4 @@
-const { Business, Category, Appointment } = require("../models");
+const { Business, Category, Appointment, Resource } = require("../models");
 const { Op } = require("sequelize");
 const { sequelize } = require("../models");
 const { sendBookingEmail } = require("../services/mailer");
@@ -13,169 +13,364 @@ function generateCancelToken() {
 }
 
 /**
- * Book an appointment by business slug
+ * Internal handler for booking
+ */
+async function bookAppointmentHandler({
+  business,
+  category,
+  startAt,
+  customerName,
+  customerEmail,
+  customerPhone,
+  transaction,
+}) {
+  // 🔒 Lock resources
+  const resources = await Resource.findAll({
+    where: { businessId: business.id },
+    order: [["id", "ASC"]],
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+
+  if (!resources.length) {
+    throw { status: 409, error: "no_resources_available" };
+  }
+
+  const start = moment.tz(startAt, business.timezone);
+  if (!start.isValid()) {
+    throw { status: 400, error: "invalid_startAt" };
+  }
+
+  const end = start.clone().add(category.durationMinutes || 30, "minutes");
+
+  // 🔒 Lock overlapping appointments
+  const overlappingAppointments = await Appointment.findAll({
+    where: {
+      businessId: business.id,
+      categoryId: category.id,
+      status: "booked",
+      startAt: { [Op.lt]: end.clone().utc().toDate() },
+      endAt: { [Op.gt]: start.clone().utc().toDate() },
+    },
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+
+  const bookedResourceIds = new Set(
+    overlappingAppointments.map((a) => a.resourceId)
+  );
+
+  const availableResource = resources.find((r) => !bookedResourceIds.has(r.id));
+
+  if (!availableResource) {
+    throw { status: 409, error: "slot_taken" };
+  }
+
+  const referenceNumber = await generateReferenceNumber(business);
+
+  const appt = await Appointment.create(
+    {
+      businessId: business.id,
+      userId: business.ownerId,
+      categoryId: category.id,
+      resourceId: availableResource.id,
+      startAt: start.clone().utc().toDate(),
+      endAt: end.clone().utc().toDate(),
+      customerName: customerName.trim(),
+      customerEmail,
+      customerPhone,
+      timezoneAtBooking: business.timezone,
+      cancelToken: generateCancelToken(),
+      referenceNumber,
+      status: "booked",
+    },
+    { transaction }
+  );
+
+  if (customerEmail) {
+    sendBookingEmail({
+      to: customerEmail,
+      business,
+      category,
+      appointment: appt,
+    }).catch(console.error);
+  }
+
+  return appt;
+}
+
+/**
+ * BOOK APPOINTMENT BY SLUG
  */
 async function bookAppointment(req, res) {
   const { slug } = req.params;
   const { categoryId, startAt, customerName, customerEmail, customerPhone } =
     req.body;
 
-  if (!categoryId || !startAt || !customerName) {
+  if (!categoryId || !startAt || !customerName)
     return res.status(400).json({ error: "missing_fields" });
-  }
 
-  const t = await sequelize.transaction();
-
+  const transaction = await Appointment.sequelize.transaction();
   try {
-    const business = await Business.findOne({
-      where: { slug },
-      transaction: t,
-    });
+    const business = await Business.findOne({ where: { slug }, transaction });
     if (!business) throw { status: 404, error: "business_not_found" };
 
-    const category = await Category.findByPk(categoryId, { transaction: t });
+    const category = await Category.findByPk(categoryId, { transaction });
     if (!category) throw { status: 404, error: "category_not_found" };
 
-    // Parse start time in business timezone
-    const start = moment.tz(startAt, business.timezone);
-    if (!start.isValid()) throw { status: 400, error: "invalid_startAt" };
-
-    const end = start.clone().add(category.durationMinutes || 30, "minutes");
-
-    // Lock overlapping appointments (compare in UTC)
-    const overlapping = await Appointment.findOne({
-      where: {
-        businessId: business.id,
-        categoryId,
-        startAt: { [Op.lt]: end.clone().utc().toDate() },
-        endAt: { [Op.gt]: start.clone().utc().toDate() },
-      },
-      transaction: t,
-      lock: t.LOCK.UPDATE,
-    });
-
-    if (overlapping) throw { status: 409, error: "slot_taken" };
-
-    const referenceNumber = await generateReferenceNumber(business);
-
-    // Create appointment with UTC timestamps
-    const appt = await Appointment.create(
-      {
-        businessId: business.id,
-        userId: business.ownerId,
-        categoryId,
-        startAt: start.clone().utc().toDate(),
-        endAt: end.clone().utc().toDate(),
-        customerName: customerName.trim(),
-        customerEmail,
-        customerPhone,
-        timezoneAtBooking: business.timezone,
-        cancelToken: generateCancelToken(),
-        referenceNumber,
-      },
-      { transaction: t }
-    );
-
-    await t.commit();
-
-    // Send booking email asynchronously
-    sendBookingEmail({
-      to: customerEmail,
+    const appt = await bookAppointmentHandler({
       business,
       category,
-      appointment: appt,
-    }).catch(console.error);
+      startAt,
+      customerName,
+      customerEmail,
+      customerPhone,
+      transaction,
+    });
 
-    return res.status(201).json(appt);
+    await transaction.commit();
+    res.status(201).json(appt);
   } catch (err) {
-    await t.rollback();
+    await transaction.rollback();
     if (err.status) return res.status(err.status).json({ error: err.error });
-    if (err.name === "SequelizeUniqueConstraintError")
-      return res.status(409).json({ error: "referenceNumber_conflict" });
-
     console.error("bookAppointment error:", err);
-    return res.status(500).json({ error: "internal_error" });
+    res.status(500).json({ error: "internal_error" });
   }
 }
 
 /**
- * Book an appointment by business ID
+ * BOOK APPOINTMENT BY BUSINESS ID
  */
 async function bookAppointmentById(req, res) {
   const { id } = req.params;
   const { categoryId, startAt, customerName, customerEmail, customerPhone } =
     req.body;
 
-  if (!categoryId || !startAt || !customerName) {
+  if (!categoryId || !startAt || !customerName)
     return res.status(400).json({ error: "missing_fields" });
-  }
 
-  const t = await sequelize.transaction();
-
+  const transaction = await Appointment.sequelize.transaction();
   try {
-    const business = await Business.findByPk(id, { transaction: t });
+    const business = await Business.findByPk(id, { transaction });
     if (!business) throw { status: 404, error: "business_not_found" };
 
-    const category = await Category.findByPk(categoryId, { transaction: t });
+    const category = await Category.findByPk(categoryId, { transaction });
     if (!category) throw { status: 404, error: "category_not_found" };
 
-    const start = moment.tz(startAt, business.timezone);
-    if (!start.isValid()) throw { status: 400, error: "invalid_startAt" };
-
-    const end = start.clone().add(category.durationMinutes || 30, "minutes");
-
-    const overlapping = await Appointment.findOne({
-      where: {
-        businessId: business.id,
-        categoryId,
-        startAt: { [Op.lt]: end.clone().utc().toDate() },
-        endAt: { [Op.gt]: start.clone().utc().toDate() },
-      },
-      transaction: t,
-      lock: t.LOCK.UPDATE,
-    });
-
-    if (overlapping) throw { status: 409, error: "slot_taken" };
-
-    const referenceNumber = await generateReferenceNumber(business);
-
-    const appt = await Appointment.create(
-      {
-        businessId: business.id,
-        userId: business.ownerId,
-        categoryId,
-        startAt: start.clone().utc().toDate(),
-        endAt: end.clone().utc().toDate(),
-        customerName: customerName.trim(),
-        customerEmail,
-        customerPhone,
-        timezoneAtBooking: business.timezone,
-        cancelToken: generateCancelToken(),
-        referenceNumber,
-      },
-      { transaction: t }
-    );
-
-    await t.commit();
-
-    sendBookingEmail({
-      to: customerEmail,
+    const appt = await bookAppointmentHandler({
       business,
       category,
-      appointment: appt,
-    }).catch(console.error);
+      startAt,
+      customerName,
+      customerEmail,
+      customerPhone,
+      transaction,
+    });
 
-    return res.status(201).json(appt);
+    await transaction.commit();
+    res.status(201).json(appt);
   } catch (err) {
-    await t.rollback();
+    await transaction.rollback();
     if (err.status) return res.status(err.status).json({ error: err.error });
-    if (err.name === "SequelizeUniqueConstraintError")
-      return res.status(409).json({ error: "referenceNumber_conflict" });
-
     console.error("bookAppointmentById error:", err);
-    return res.status(500).json({ error: "internal_error" });
+    res.status(500).json({ error: "internal_error" });
   }
 }
+
+// /**
+//  * Book an appointment by business slug
+//  */
+// async function bookAppointment(req, res) {
+//   const { slug } = req.params;
+//   const { categoryId, startAt, customerName, customerEmail, customerPhone } =
+//     req.body;
+
+//   if (!categoryId || !startAt || !customerName) {
+//     return res.status(400).json({ error: "missing_fields" });
+//   }
+
+//   const t = await Appointment.sequelize.transaction();
+
+//   try {
+//     const business = await Business.findOne({
+//       where: { slug },
+//       transaction: t,
+//     });
+//     if (!business) throw { status: 404, error: "business_not_found" };
+
+//     const category = await Category.findByPk(categoryId, { transaction: t });
+//     if (!category) throw { status: 404, error: "category_not_found" };
+
+//     const start = moment.tz(startAt, business.timezone);
+//     if (!start.isValid()) throw { status: 400, error: "invalid_startAt" };
+
+//     const end = start.clone().add(category.durationMinutes || 30, "minutes");
+
+//     // 🔹 Get all resources for this business
+//     const resources = await Resource.findAll({
+//       where: { businessId: business.id },
+//       transaction: t,
+//     });
+
+//     if (!resources.length)
+//       throw { status: 409, error: "no_resources_available" };
+
+//     // 🔹 Check overlapping appointments per resource
+//     const overlappingAppointments = await Appointment.findAll({
+//       where: {
+//         businessId: business.id,
+//         categoryId,
+//         startAt: { [Op.lt]: end.clone().utc().toDate() },
+//         endAt: { [Op.gt]: start.clone().utc().toDate() },
+//         status: "booked",
+//       },
+//       transaction: t,
+//       lock: t.LOCK.UPDATE,
+//     });
+
+//     const bookedResourceIds = overlappingAppointments.map((a) => a.resourceId);
+//     const availableResources = resources.filter(
+//       (r) => !bookedResourceIds.includes(r.id)
+//     );
+
+//     if (!availableResources.length) throw { status: 409, error: "slot_taken" };
+
+//     const resourceToBook = availableResources[0]; // assign first free resource
+//     const referenceNumber = await generateReferenceNumber(business);
+
+//     const appt = await Appointment.create(
+//       {
+//         businessId: business.id,
+//         userId: business.ownerId,
+//         categoryId,
+//         resourceId: resourceToBook.id,
+//         startAt: start.clone().utc().toDate(),
+//         endAt: end.clone().utc().toDate(),
+//         customerName: customerName.trim(),
+//         customerEmail,
+//         customerPhone,
+//         timezoneAtBooking: business.timezone,
+//         cancelToken: generateCancelToken(),
+//         referenceNumber,
+//       },
+//       { transaction: t }
+//     );
+
+//     await t.commit();
+
+//     sendBookingEmail({
+//       to: customerEmail,
+//       business,
+//       category,
+//       appointment: appt,
+//     }).catch(console.error);
+
+//     return res.status(201).json(appt);
+//   } catch (err) {
+//     await t.rollback();
+//     if (err.status) return res.status(err.status).json({ error: err.error });
+//     if (err.name === "SequelizeUniqueConstraintError")
+//       return res.status(409).json({ error: "referenceNumber_conflict" });
+
+//     console.error("bookAppointment error:", err);
+//     return res.status(500).json({ error: "internal_error" });
+//   }
+// }
+
+// /**
+//  * Book an appointment by business ID
+//  */
+// async function bookAppointmentById(req, res) {
+//   const { id } = req.params;
+//   const { categoryId, startAt, customerName, customerEmail, customerPhone } =
+//     req.body;
+
+//   if (!categoryId || !startAt || !customerName)
+//     return res.status(400).json({ error: "missing_fields" });
+
+//   const t = await Appointment.sequelize.transaction();
+
+//   try {
+//     const business = await Business.findByPk(id, { transaction: t });
+//     if (!business) throw { status: 404, error: "business_not_found" };
+
+//     const category = await Category.findByPk(categoryId, { transaction: t });
+//     if (!category) throw { status: 404, error: "category_not_found" };
+
+//     const start = moment.tz(startAt, business.timezone);
+//     if (!start.isValid()) throw { status: 400, error: "invalid_startAt" };
+
+//     const end = start.clone().add(category.durationMinutes || 30, "minutes");
+
+//     // 🔹 Get all resources
+//     const resources = await Resource.findAll({
+//       where: { businessId: business.id },
+//       transaction: t,
+//     });
+//     if (!resources.length)
+//       throw { status: 409, error: "no_resources_available" };
+
+//     // 🔹 Overlapping appointments per resource
+//     const overlappingAppointments = await Appointment.findAll({
+//       where: {
+//         businessId: business.id,
+//         categoryId,
+//         startAt: { [Op.lt]: end.clone().utc().toDate() },
+//         endAt: { [Op.gt]: start.clone().utc().toDate() },
+//         status: "booked",
+//       },
+//       transaction: t,
+//       lock: t.LOCK.UPDATE,
+//     });
+
+//     const bookedResourceIds = overlappingAppointments.map((a) => a.resourceId);
+//     const availableResources = resources.filter(
+//       (r) => !bookedResourceIds.includes(r.id)
+//     );
+
+//     if (!availableResources.length) throw { status: 409, error: "slot_taken" };
+
+//     const resourceToBook = availableResources[0];
+//     const referenceNumber = await generateReferenceNumber(business);
+
+//     const appt = await Appointment.create(
+//       {
+//         businessId: business.id,
+//         userId: business.ownerId,
+//         categoryId,
+//         resourceId: resourceToBook.id,
+//         startAt: start.clone().utc().toDate(),
+//         endAt: end.clone().utc().toDate(),
+//         customerName: customerName.trim(),
+//         customerEmail,
+//         customerPhone,
+//         timezoneAtBooking: business.timezone,
+//         cancelToken: generateCancelToken(),
+//         referenceNumber,
+//       },
+//       { transaction: t }
+//     );
+
+//     await t.commit();
+
+//     sendBookingEmail({
+//       to: customerEmail,
+//       business,
+//       category,
+//       appointment: appt,
+//     }).catch(console.error);
+
+//     return res.status(201).json(appt);
+//   } catch (err) {
+//     await t.rollback();
+//     if (err.status) return res.status(err.status).json({ error: err.error });
+//     if (err.name === "SequelizeUniqueConstraintError")
+//       return res.status(409).json({ error: "referenceNumber_conflict" });
+
+//     console.error("bookAppointmentById error:", err);
+//     return res.status(500).json({ error: "internal_error" });
+//   }
+// }
 
 /**
  * List categories for a business by slug

@@ -20,6 +20,11 @@ const Appointment = sequelize.define(
       allowNull: false,
     },
 
+    resourceId: {
+      type: DataTypes.UUID,
+      allowNull: false, // each appointment is assigned to a resource
+    },
+
     startAt: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -59,27 +64,41 @@ const Appointment = sequelize.define(
       type: DataTypes.JSONB,
       allowNull: true,
     },
+
     cancelToken: {
       type: DataTypes.STRING,
       allowNull: true,
     },
+
     referenceNumber: {
       type: DataTypes.STRING,
       allowNull: false,
     },
   },
-  // Appointment model
-
   {
     indexes: [
+      // Unique reference number per business
       {
         unique: true,
-        fields: ["businessId", "categoryId", "startAt"],
-        name: "unique_business_category_start",
+        fields: ["businessId", "referenceNumber"],
       },
+
+      // Optimized for overlapping appointment checks
       {
-        unique: true,
-        fields: ["businessId", "referenceNumber"], // unique per business
+        name: "idx_appointment_business_resource_time",
+        fields: ["businessId", "resourceId", "startAt", "endAt"],
+      },
+
+      // Optimized for filtering by category & status (available/booked)
+      {
+        name: "idx_appointment_business_category_status",
+        fields: ["businessId", "categoryId", "status"],
+      },
+
+      // Optimized for slot generation queries
+      {
+        name: "idx_appointment_business_start_end",
+        fields: ["businessId", "startAt", "endAt"],
       },
     ],
   }

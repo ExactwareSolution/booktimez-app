@@ -10,6 +10,7 @@ const Appointment = require("./Appointment");
 const Notification = require("./Notification");
 const BusinessCategory = require("./BusinessCategory");
 const Payment = require("./Payment");
+const Resource = require("./Resource"); // ✅ NEW
 
 // --------------------
 // Model Relationships
@@ -51,6 +52,14 @@ Appointment.belongsTo(Category, { foreignKey: "categoryId" });
 
 // USER ↔ APPOINTMENT
 Appointment.belongsTo(User, { foreignKey: "userId" });
+
+// RESOURCE ↔ APPOINTMENT
+Resource.hasMany(Appointment, { foreignKey: "resourceId" });
+Appointment.belongsTo(Resource, { foreignKey: "resourceId" });
+
+// BUSINESS ↔ RESOURCE
+Business.hasMany(Resource, { foreignKey: "businessId" });
+Resource.belongsTo(Business, { foreignKey: "businessId" });
 
 // APPOINTMENT ↔ NOTIFICATION
 Appointment.hasMany(Notification, { foreignKey: "appointmentId" });
@@ -96,4 +105,6 @@ module.exports = {
   Availability,
   Appointment,
   Notification,
+  Payment,
+  Resource, // ✅ NEW
 };

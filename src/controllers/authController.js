@@ -78,15 +78,23 @@ async function google(req, res) {
       return res.status(400).json({ error: "googleId + email required" });
     }
 
-    // 🔹 Find or create user
+    // 🔹 Get the Free plan
+    const freePlan = await Plan.findOne({ where: { code: "free" } });
+    if (!freePlan) {
+      return res.status(500).json({ error: "Free plan not configured" });
+    }
+
+    // 🔹 Find user by googleId or email
     let user = await User.findOne({ where: { googleId } });
     if (!user) user = await User.findOne({ where: { email } });
 
     if (user) {
+      // Update googleId if missing
       user.googleId = googleId;
       if (!user.planId) user.planId = freePlan.id;
       await user.save();
     } else {
+      // Create new user with Free plan
       user = await User.create({
         email,
         googleId,
@@ -103,13 +111,14 @@ async function google(req, res) {
     const businessCount = await Business.count({
       where: { ownerId: user.id },
     });
-
     const isBusinessAvailable = businessCount > 0;
 
     // 🔹 JWT
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
-      expiresIn: "7d",
-    });
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
     res.json({
       token,
@@ -118,7 +127,7 @@ async function google(req, res) {
         email: user.email,
         name: user.name,
         planId: user.planId,
-        planCode: plan?.code || "FREE", // ✅ FIXED
+        planCode: plan?.code || "free",
         role: user.role,
       },
       isBusinessAvailable,
