@@ -1,3 +1,4 @@
+const { DateTime } = require("luxon");
 const { Availability, Business, Category, Resource } = require("../models");
 
 /**
@@ -5,8 +6,14 @@ const { Availability, Business, Category, Resource } = require("../models");
  */
 async function createAvailability(req, res) {
   const businessId = req.params.businessId;
-  const { categoryId, weekday, startTime, endTime, slotDurationMinutes } =
-    req.body;
+  const {
+    categoryId,
+    weekday,
+    startTime,
+    endTime,
+    userTimezone,
+    slotDurationMinutes,
+  } = req.body;
 
   try {
     const business = await Business.findByPk(businessId);
@@ -19,8 +26,10 @@ async function createAvailability(req, res) {
     if (!Number.isInteger(wd) || wd < 0 || wd > 6)
       return res.status(400).json({ error: "weekday must be 0-6" });
 
-    if (!startTime || !endTime)
-      return res.status(400).json({ error: "startTime and endTime required" });
+    if (!startTime || !endTime || !userTimezone)
+      return res
+        .status(400)
+        .json({ error: "startTime, endTime, and userTimezone required" });
     if (!categoryId)
       return res.status(400).json({ error: "categoryId required" });
 
@@ -33,16 +42,33 @@ async function createAvailability(req, res) {
         .status(400)
         .json({ error: "category_not_associated_with_business" });
 
+    // -----------------------
+    // Convert from user's local time → business timezone → store as UTC
+    // -----------------------
+    const startInBusinessTZ = DateTime.fromISO(startTime, {
+      zone: userTimezone,
+    }).setZone(business.timezone);
+    const endInBusinessTZ = DateTime.fromISO(endTime, {
+      zone: userTimezone,
+    }).setZone(business.timezone);
+
+    if (!startInBusinessTZ.isValid || !endInBusinessTZ.isValid)
+      return res.status(400).json({ error: "Invalid startTime or endTime" });
+
+    // Convert to UTC for DB
     const availability = await Availability.create({
       businessId,
       categoryId,
       weekday: wd,
-      startTime,
-      endTime,
+      startTime: startInBusinessTZ.toUTC().toISO(),
+      endTime: endInBusinessTZ.toUTC().toISO(),
       slotDurationMinutes: slotDurationMinutes || null,
     });
 
-    res.json(availability);
+    res.json({
+      availability,
+      business: { id: business.id, timezone: business.timezone },
+    });
   } catch (err) {
     console.error("createAvailability error:", err);
     res.status(500).json({ error: "internal_error" });
