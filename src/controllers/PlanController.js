@@ -32,7 +32,6 @@ async function createPlan(req, res) {
       name: payload.name,
       monthlyPriceCents: payload.monthlyPriceCents || 0,
       maxBookingsPerMonth: payload.maxBookingsPerMonth || null,
-      maxBusinesses: payload.maxBusinesses || null,
       maxCategories: payload.maxCategories || null,
       languages: payload.languages || ["en"],
       brandingRemoved: !!payload.brandingRemoved,

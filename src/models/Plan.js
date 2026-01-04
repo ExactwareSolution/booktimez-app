@@ -14,7 +14,6 @@ const Plan = sequelize.define("Plan", {
   },
   name: { type: DataTypes.STRING, allowNull: false },
   maxBookingsPerMonth: { type: DataTypes.INTEGER, allowNull: true },
-  maxBusinesses: { type: DataTypes.INTEGER, allowNull: true },
   maxCategories: { type: DataTypes.INTEGER, allowNull: true },
   maxResources: { type: DataTypes.INTEGER, allowNull: true },
   languages: { type: DataTypes.ARRAY(DataTypes.STRING), defaultValue: ["en"] },
