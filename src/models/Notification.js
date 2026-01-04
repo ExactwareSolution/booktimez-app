@@ -20,6 +20,8 @@ const Notification = sequelize.define("Notification", {
     defaultValue: "pending",
   },
   attempts: { type: DataTypes.INTEGER, defaultValue: 0 },
+  read: { type: DataTypes.BOOLEAN, defaultValue: false },
+  deleted: { type: DataTypes.BOOLEAN, defaultValue: false },
 });
 
 module.exports = Notification;
