@@ -8,6 +8,10 @@ const {
   deleteCategory,
 } = require("../controllers/CategoryController");
 const { authMiddleware, adminMiddleware } = require("../middleware/auth");
+const multer = require("multer");
+
+// Multer setup
+const upload = multer({ dest: "uploads/" });
 
 // Public: list all categories
 router.get("/", listCategories);
@@ -16,7 +20,13 @@ router.get("/", listCategories);
 router.get("/:id", getCategoryById);
 
 // Admin-only CRUD
-router.post("/", authMiddleware, adminMiddleware, createCategory);
+router.post(
+  "/",
+  upload.single("icon"),
+  authMiddleware,
+  adminMiddleware,
+  createCategory
+);
 router.put("/:id", authMiddleware, adminMiddleware, updateCategory);
 router.delete("/:id", authMiddleware, adminMiddleware, deleteCategory);
 
