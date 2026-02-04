@@ -101,6 +101,7 @@ async function google(req, res) {
         name,
         planId: freePlan.id,
         role: "owner",
+        isActive: true,
       });
     }
 
@@ -114,11 +115,9 @@ async function google(req, res) {
     const isBusinessAvailable = businessCount > 0;
 
     // 🔹 JWT
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
+      expiresIn: "7d",
+    });
 
     res.json({
       token,
@@ -129,6 +128,7 @@ async function google(req, res) {
         planId: user.planId,
         planCode: plan?.code || "free",
         role: user.role,
+        isActive: user.isActive,
       },
       isBusinessAvailable,
     });
@@ -155,7 +155,7 @@ async function updatePassword(req, res) {
     // 3. Update the user record
     const [updated] = await User.update(
       { password: passwordHash },
-      { where: { id: userId } }
+      { where: { id: userId } },
     );
 
     if (!updated) {

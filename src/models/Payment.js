@@ -10,20 +10,23 @@ const Payment = sequelize.define("Payment", {
   userId: { type: DataTypes.UUID, allowNull: false },
   planId: { type: DataTypes.UUID, allowNull: true },
   businessId: { type: DataTypes.UUID, allowNull: true },
-  appointmentId: { type: DataTypes.UUID, allowNull: true },
   provider: {
     type: DataTypes.ENUM("stripe", "razorpay", "other"),
     allowNull: false,
   },
   providerPaymentId: { type: DataTypes.STRING, allowNull: true },
   providerOrderId: { type: DataTypes.STRING, allowNull: true },
-  amountCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+  amountInPaise: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
   currency: { type: DataTypes.STRING, allowNull: false, defaultValue: "usd" },
   status: {
     type: DataTypes.ENUM("pending", "paid", "failed", "cancelled"),
     defaultValue: "pending",
   },
   metadata: { type: DataTypes.JSONB, allowNull: true },
+  isDeleted: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
 });
 
 module.exports = Payment;

@@ -12,26 +12,21 @@ const plansRoutes = require("./routes/plans");
 const categoryRoutes = require("./routes/category");
 const analyticsRoutes = require("./routes/analytics");
 const resourceRoutes = require("./routes/resource");
+const paymentRoutes = require("./routes/payment");
 
 const app = express();
+
 app.use(
   cors({
-    origin: true,
-    credentials: true,
-  })
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 200,
+  }),
 );
 
 app.use(bodyParser.json());
 
-app.use((req, res, next) => {
-  const host = req.headers.host || "";
-  const cleanHost = host.split(":")[0]; // remove port
-  const parts = cleanHost.split(".");
-  req.subdomain = parts.length > 2 ? parts[0] : null;
-  next();
-});
-
-// Serve uploaded files (logos)
 const path = require("path");
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
@@ -65,6 +60,7 @@ app.use("/api/plans", plansRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/resources", resourceRoutes);
+app.use("/api/payments", paymentRoutes);
 
 app.get("/", (req, res) => res.json({ ok: true }));
 
@@ -119,7 +115,10 @@ async function start() {
     console.log("Seeded default plans");
   }
 
-  app.listen(PORT, () => console.log(`Server listening on ${PORT}`));
+  // app.listen(PORT, () => console.log(`Server listening on ${PORT}`));
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server listening on ${PORT}`);
+  });
 }
 
 start().catch((err) => {
@@ -131,10 +130,10 @@ start().catch((err) => {
   console.error("\nDiagnostic hints:");
   console.error("- Ensure your database is running and reachable");
   console.error(
-    "- Check env vars: DATABASE_URL or DB_HOST/DB_NAME/DB_USER/DB_PASSWORD"
+    "- Check env vars: DATABASE_URL or DB_HOST/DB_NAME/DB_USER/DB_PASSWORD",
   );
   console.error(
-    "- Example: export DATABASE_URL=postgres://user:pass@localhost:5432/booktimez"
+    "- Example: export DATABASE_URL=postgres://user:pass@localhost:5432/booktimez",
   );
 
   // Print a short summary of DB env vars (do not print passwords)
@@ -144,7 +143,7 @@ start().catch((err) => {
         process.env.DB_PORT || "5432"
       } DB_NAME=${process.env.DB_NAME || "(none)"} DATABASE_URL=${
         process.env.DATABASE_URL ? "(set)" : "(unset)"
-      }`
+      }`,
     );
   } catch (e) {}
 

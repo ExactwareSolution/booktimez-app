@@ -1,10 +1,21 @@
-const { Resource } = require("../models");
+const { Resource, Availability } = require("../models");
 
 // Get all resources for a business
 exports.getResources = async (req, res) => {
   const { businessId } = req.params;
   try {
-    const resources = await Resource.findAll({ where: { businessId } });
+    const resources = await Resource.findAll({
+      where: { businessId },
+      include: [
+        {
+          model: Availability,
+          as: "availabilities",
+          // optional: you can include Category if you want
+          // include: [{ model: Category }]
+        },
+      ],
+      order: [["name", "ASC"]], // optional: sort by name
+    });
     res.json(resources);
   } catch (err) {
     console.error(err);

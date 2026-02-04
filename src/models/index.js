@@ -11,6 +11,7 @@ const Notification = require("./Notification");
 const BusinessCategory = require("./BusinessCategory");
 const Payment = require("./Payment");
 const Resource = require("./Resource"); // ✅ NEW
+const AvailabilityResource = require("./AvailabilityResource"); // ✅ NEW
 
 // --------------------
 // Model Relationships
@@ -61,6 +62,18 @@ Appointment.belongsTo(Resource, { foreignKey: "resourceId" });
 Business.hasMany(Resource, { foreignKey: "businessId" });
 Resource.belongsTo(Business, { foreignKey: "businessId" });
 
+// RESOURCE ↔ AVAILABILITY
+Availability.belongsToMany(Resource, {
+  through: AvailabilityResource,
+  as: "resources", // alias used in include
+  foreignKey: "availabilityId",
+});
+Resource.belongsToMany(Availability, {
+  through: AvailabilityResource,
+  as: "availabilities",
+  foreignKey: "resourceId",
+});
+
 // APPOINTMENT ↔ NOTIFICATION
 Appointment.hasMany(Notification, { foreignKey: "appointmentId" });
 Notification.belongsTo(Appointment, { foreignKey: "appointmentId" });
@@ -107,4 +120,5 @@ module.exports = {
   Notification,
   Payment,
   Resource, // ✅ NEW
+  AvailabilityResource, // ✅ NEW
 };

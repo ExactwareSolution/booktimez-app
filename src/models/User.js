@@ -17,6 +17,9 @@ const User = sequelize.define("User", {
   role: { type: DataTypes.ENUM("owner", "admin"), defaultValue: "owner" },
   resetPasswordToken: { type: DataTypes.STRING, allowNull: true },
   resetPasswordExpires: { type: DataTypes.DATE, allowNull: true },
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+  createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+  updatedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
 });
 
 module.exports = User;

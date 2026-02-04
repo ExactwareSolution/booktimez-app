@@ -1,4 +1,4 @@
-const { Plan, User } = require("../models");
+const { Plan, User, Payment, Business } = require("../models");
 const { Op } = require("sequelize");
 const crypto = require("crypto");
 const Stripe = require("stripe");
@@ -222,13 +222,30 @@ async function confirmCheckout(req, res) {
       const user = await User.findByPk(userId);
       if (!user) return res.status(404).json({ error: "user_not_found" });
 
+      const business = await Business.findOne({
+        where: { ownerId: userId },
+      });
+
       const expiresAt = new Date();
       expiresAt.setMonth(expiresAt.getMonth() + 1);
 
       user.planId = plan.id;
       user.planExpiresAt = expiresAt;
       await user.save();
-
+      await Payment.create({
+        userId,
+        planId: plan.id,
+        businessId: business ? business.id : null,
+        provider: "razorpay",
+        providerPaymentId: body.razorpay_payment_id,
+        providerOrderId: body.razorpay_order_id,
+        amountInPaise: order.amount, // paise
+        currency: order.currency,
+        status: "paid",
+        metadata: {
+          planCode: plan.code,
+        },
+      });
       return res.json({
         ok: true,
         planId: plan.id,

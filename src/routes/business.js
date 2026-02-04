@@ -75,7 +75,7 @@ const {
 router.post(
   "/:businessId/categories",
   upload.none(),
-  createCategoryForBusiness
+  createCategoryForBusiness,
 );
 
 router.get("/:businessId/categories", listCategoriesForBusiness);
@@ -87,6 +87,7 @@ const {
   createAvailability,
   listAvailabilities,
   deleteAvailability,
+  updateAvailability,
 } = require("../controllers/AvailabilityController");
 
 const {
@@ -96,6 +97,7 @@ const {
 
 router.post("/:businessId/availabilities", createAvailability);
 router.get("/:businessId/availabilities", listAvailabilities);
+router.put("/:businessId/availabilities/:id", updateAvailability);
 router.delete("/:businessId/availabilities/:id", deleteAvailability);
 
 router.get("/:businessId/appointments", listAppointments);
