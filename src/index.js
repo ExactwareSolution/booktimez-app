@@ -13,17 +13,21 @@ const categoryRoutes = require("./routes/category");
 const analyticsRoutes = require("./routes/analytics");
 const resourceRoutes = require("./routes/resource");
 const paymentRoutes = require("./routes/payment");
+const { worker } = require("./workers/notificationWorker");
 
 const app = express();
+// start background workers
+require("./workers/notificationWorker");
+const corsOptions = {
+  origin: "*", // or specify your frontend origin for production
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  preflightContinue: false, // important
+  optionsSuccessStatus: 204, // modern browsers expect 204 for OPTIONS
+};
 
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    optionsSuccessStatus: 200,
-  }),
-);
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions)); // allow preflight for all routes
 
 app.use(bodyParser.json());
 

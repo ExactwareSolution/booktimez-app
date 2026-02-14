@@ -6,7 +6,12 @@ const databaseUrl = process.env.DATABASE_URL || null;
 const sequelize = databaseUrl
   ? new Sequelize(databaseUrl, {
       logging: false,
-      dialectOptions: {},
+      dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false,
+      },
+    },
     })
   : new Sequelize(
       process.env.DB_NAME || "bookingtimez_db",
